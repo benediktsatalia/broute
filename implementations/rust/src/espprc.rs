@@ -1,4 +1,4 @@
-use std::{cell::Cell};
+use std::cell::Cell;
 
 use crate::tsp;
 use std::collections::VecDeque;
@@ -20,10 +20,14 @@ impl Label {
             return false;
         }
         for (v1, v2) in self.visited.iter().zip(other.visited.iter()) {
-            if v1 > v2 { return false}
+            if v1 > v2 {
+                return false;
+            }
         }
         for (q1, q2) in self.q.iter().zip(other.q.iter()) {
-            if q1 > q2 { return false}
+            if q1 > q2 {
+                return false;
+            }
         }
         return true;
     }
@@ -63,14 +67,16 @@ impl LabelCollection {
         }
         let cost = self.labels[from].cost + d.aux(self.labels[from].at, to);
         let length = self.labels[from].length + d.d(self.labels[from].at, to);
-        let nl = Label{at: to,
-                       visited: visited,
-                       ignore: Cell::new(false), 
-                       predecessor: Some(from),
-                       cost: cost,
-                       length: length,
-                       q: q,
-                       successors: Vec::new()};
+        let nl = Label {
+            at: to,
+            visited: visited,
+            ignore: Cell::new(false),
+            predecessor: Some(from),
+            cost: cost,
+            length: length,
+            q: q,
+            successors: Vec::new(),
+        };
         self.labels.push(nl);
         return self.labels.len() - 1;
     }
@@ -79,9 +85,9 @@ impl LabelCollection {
     fn addsuccessor(&mut self, from: usize, to: usize) {
         self.labels[from].successors.push(to);
     }
-    
+
     fn marksuccessors(&self, index: usize) {
-        let Label{ successors, .. } = &self.labels[index];
+        let Label { successors, .. } = &self.labels[index];
         for &s in successors {
             &self.labels[s].ignore.set(true);
             self.marksuccessors(s);
@@ -110,10 +116,9 @@ impl LabelCollection {
     }
 }
 
-pub fn solve(d: &tsp::TSPData,
-             nresources: usize, resourcecapacity: usize, maxlen: i32) -> f64 {
+pub fn solve(d: &tsp::TSPData, nresources: usize, resourcecapacity: usize, maxlen: i32) -> f64 {
     // we will store all labels here
-    let mut lc = LabelCollection{ labels: Vec::new() };
+    let mut lc = LabelCollection { labels: Vec::new() };
     let mut q: VecDeque<usize> = VecDeque::new();
     let mut in_q: Vec<bool> = vec![false; d.n];
     // initial label
@@ -124,7 +129,7 @@ pub fn solve(d: &tsp::TSPData,
     let mut labels: Vec<Vec<usize>> = vec![Vec::new(); d.n];
     labels[0].push(l0);
     // main DP loop
-    while ! q.is_empty() {
+    while !q.is_empty() {
         let n = q.pop_front().unwrap();
         in_q[n] = false;
         for i in 0..labels[n].len() {
@@ -133,28 +138,30 @@ pub fn solve(d: &tsp::TSPData,
                 continue;
             }
             for succ in 0..d.n {
-                if lc.labels[lind].visited[succ] || succ == n { continue }
+                if lc.labels[lind].visited[succ] || succ == n {
+                    continue;
+                }
                 // is the extension length-feasible?
-                if lc.labels[lind].length + d.d(n, succ) + d.d(succ, 0)
-                    > maxlen {
-                        continue;
-                    }
+                if lc.labels[lind].length + d.d(n, succ) + d.d(succ, 0) > maxlen {
+                    continue;
+                }
                 // is it resource-feasible?
                 let mut rfeas: bool = true;
                 for r in 0..nresources {
-                    if (succ & (1 << r)) > 0 &&
-                        lc.labels[lind].q[r] + 1 > resourcecapacity {
-                            rfeas = false;
-                            break;
-                        }
+                    if (succ & (1 << r)) > 0 && lc.labels[lind].q[r] + 1 > resourcecapacity {
+                        rfeas = false;
+                        break;
+                    }
                 }
-                if ! rfeas { continue }
+                if !rfeas {
+                    continue;
+                }
                 // at this point we know the extension is feasible
                 let nl = lc.extend(d, lind, succ);
                 let added = lc.updatedominance(&mut labels[succ], nl);
                 if added {
                     lc.addsuccessor(lind, nl);
-                    if ! in_q[succ] && succ != 0 {
+                    if !in_q[succ] && succ != 0 {
                         q.push_back(succ);
                         in_q[succ] = true;
                     }

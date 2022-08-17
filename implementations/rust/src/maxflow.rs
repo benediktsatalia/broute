@@ -24,12 +24,13 @@ pub fn edmondskarp(d: &mut tsp::TSPData, s: usize, t: usize) -> f64 {
             pred[i] = usize::MAX;
         }
         q.push_back(s);
-        while ! q.is_empty() {
+        while !q.is_empty() {
             let cur = q.pop_front().unwrap();
             for j in 0..d.n {
-                if j == cur { continue }
-                if pred[j] == usize::MAX && j != s &&
-                    d.aux(cur, j) > d.aux2(cur, j) {
+                if j == cur {
+                    continue;
+                }
+                if pred[j] == usize::MAX && j != s && d.aux(cur, j) > d.aux2(cur, j) {
                     pred[j] = cur;
                     q.push_back(j);
                 }

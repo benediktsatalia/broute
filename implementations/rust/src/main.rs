@@ -1,15 +1,15 @@
+use regex::Regex;
 use std::env;
 use std::fs;
-use regex::Regex;
 
 // for time measurement
 use cpu_time::ProcessTime;
 
 use rustc_version_runtime::version;
 
-mod tsp;
 mod espprc;
 mod maxflow;
+mod tsp;
 
 fn read_data(fname: &str) -> (tsp::TSPData, Vec<tsp::TSPSolution>) {
     let data = fs::read_to_string(fname).expect("Unable to read file");
@@ -24,7 +24,9 @@ fn read_data(fname: &str) -> (tsp::TSPData, Vec<tsp::TSPSolution>) {
     let mut aux: Vec<f64> = Vec::<f64>::new();
     let mut aux2: Vec<f64> = Vec::<f64>::new();
     let mut solutions: Vec<tsp::TSPSolution> = Vec::<tsp::TSPSolution>::new();
-    let mut current_sol = tsp::TSPSolution{nodes: Vec::<usize>::new()};
+    let mut current_sol = tsp::TSPSolution {
+        nodes: Vec::<usize>::new(),
+    };
     for tok in tokens {
         // header
         if n == 0 {
@@ -42,20 +44,28 @@ fn read_data(fname: &str) -> (tsp::TSPData, Vec<tsp::TSPSolution>) {
             // did we complete a solution?
             if current_sol.nodes.len() == n + 1 {
                 solutions.push(current_sol);
-                current_sol = tsp::TSPSolution{nodes: Vec::<usize>::new()};
+                current_sol = tsp::TSPSolution {
+                    nodes: Vec::<usize>::new(),
+                };
             }
         }
     }
-    return (tsp::TSPData{n: n,
-                         d: d.into_boxed_slice(),
-                         aux: aux.into_boxed_slice(),
-                         aux2: aux2.into_boxed_slice()},
-            solutions);
+    return (
+        tsp::TSPData {
+            n: n,
+            d: d.into_boxed_slice(),
+            aux: aux.into_boxed_slice(),
+            aux2: aux2.into_boxed_slice(),
+        },
+        solutions,
+    );
 }
 
-fn benchmark_one(data: &mut tsp::TSPData, solutions: &mut Vec<tsp::TSPSolution>,
-                 benchmarkname: &str)
-                 -> (i32, f64) {
+fn benchmark_one(
+    data: &mut tsp::TSPData,
+    solutions: &mut Vec<tsp::TSPSolution>,
+    benchmarkname: &str,
+) -> (i32, f64) {
     let mut count = 0;
     let mut total2opttime: f64 = 0.0;
     for sol in solutions {
@@ -91,10 +101,16 @@ fn benchmark_many(dirname: &str, benchmarkname: &str) {
         let full_name = t.to_str().unwrap();
         let (mut data, mut solutions) = read_data(full_name);
         let (n, l) = benchmark_one(&mut data, &mut solutions, benchmarkname);
-        println!("rust,Rust,flat,{},{},{},{},{},{},{}",
-                 version(), benchmarkname,
-                 base.file_name().to_str().unwrap(),
-                 data.n, solutions.len(), n, l);
+        println!(
+            "rust,Rust,flat,{},{},{},{},{},{},{}",
+            version(),
+            benchmarkname,
+            base.file_name().to_str().unwrap(),
+            data.n,
+            solutions.len(),
+            n,
+            l
+        );
     }
 }
 
