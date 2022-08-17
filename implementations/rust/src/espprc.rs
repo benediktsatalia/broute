@@ -1,35 +1,44 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{
+    cell::{Cell, RefCell},
+    rc::{Rc, Weak},
+};
 
 use crate::tsp;
 use std::collections::VecDeque;
 
-type LabelRef = Rc<RefCell<Label>>;
-
 struct Label {
     at: usize,
     visited: Vec<bool>,
-    ignore: bool,
-    predecessor: Option<LabelRef>,
+    ignore: Cell<bool>,
+    predecessor: Option<Weak<Label>>,
     cost: f64,
     length: i32,
     q: Vec<usize>,
-    successors: Vec<LabelRef>,
+    successors: RefCell<Vec<Rc<Label>>>,
 }
 
 impl Label {
-    fn empty(d: &tsp::TSPData, nresources: usize) -> LabelRef {
+    fn empty(d: &tsp::TSPData, nresources: usize) -> Rc<Label> {
         let visited: Vec<bool> = vec![false; d.n];
         let q: Vec<usize> = vec![0; nresources];
-        Rc::new(RefCell::new(Label {
+        Rc::new(Label {
             at: 0,
-            visited: visited,
-            ignore: false,
+            visited,
+            ignore: Cell::new(false),
             predecessor: None,
             cost: 0.0,
             length: 0,
-            q: q,
-            successors: Vec::new(),
-        }))
+            q,
+            successors: RefCell::new(Vec::new()),
+        })
+    }
+
+    fn ignore(&self) {
+        self.ignore.set(true);
+    }
+
+    fn is_ignored(&self) -> bool {
+        self.ignore.get()
     }
 
     fn dominates(&self, other: &Label) -> bool {
@@ -50,49 +59,48 @@ impl Label {
     }
 
     // extend label to given vertex
-    fn extend(d: &tsp::TSPData, from: &LabelRef, vertex: usize) -> LabelRef {
-        let mut visited = from.borrow().visited.clone();
+    fn extend(d: &tsp::TSPData, from: &Rc<Label>, vertex: usize) -> Rc<Label> {
+        let mut visited = from.visited.clone();
         visited[vertex] = true;
-        let mut q = from.borrow().q.clone();
-        for i in 0..q.len() {
+        let mut q = from.q.clone();
+        for (i, value) in q.iter_mut().enumerate() {
             if (vertex & (1 << i)) > 0 {
-                q[i] += 1;
+                *value += 1;
             }
         }
-        let cost = from.borrow().cost + d.aux(from.borrow().at, vertex);
-        let length = from.borrow().length + d.d(from.borrow().at, vertex);
-        Rc::new(RefCell::new(Label {
+        let cost = from.cost + d.aux(from.at, vertex);
+        let length = from.length + d.d(from.at, vertex);
+        Rc::new(Label {
             at: vertex,
-            visited: visited,
-            ignore: false,
-            predecessor: Some(from.clone()),
-            cost: cost,
-            length: length,
-            q: q,
-            successors: Vec::new(),
-        }))
+            visited,
+            ignore: Cell::new(false),
+            predecessor: Some(Rc::downgrade(from)),
+            cost,
+            length,
+            q,
+            successors: RefCell::new(Vec::new()),
+        })
     }
 
-    fn addsuccessor(&mut self, successor: &LabelRef) {
-        self.successors.push(successor.clone());
+    fn addsuccessor(&self, successor: &Rc<Label>) {
+        self.successors.borrow_mut().push(Rc::clone(successor));
     }
 
     fn marksuccessors(&self) {
-        for successor in &self.successors {
-            let mut successor = successor.borrow_mut();
-            successor.ignore = true;
+        for successor in self.successors.borrow().iter() {
+            successor.ignore();
             successor.marksuccessors();
         }
     }
 
-    fn updatedominance(labels: &mut Vec<LabelRef>, new_label: &LabelRef) -> bool {
+    fn updatedominance(labels: &mut Vec<Rc<Label>>, new_label: &Rc<Label>) -> bool {
         let mut i: usize = 0;
         while i < labels.len() {
-            if labels[i].borrow().dominates(&new_label.borrow()) {
+            if labels[i].dominates(new_label) {
                 return false;
             }
-            if new_label.borrow().dominates(&labels[i].borrow()) {
-                labels[i].borrow().marksuccessors();
+            if new_label.dominates(&labels[i]) {
+                labels[i].marksuccessors();
                 let last = labels.pop();
                 if i < labels.len() {
                     labels[i] = last.unwrap();
@@ -102,8 +110,8 @@ impl Label {
             }
         }
         // at this point the new label is not dominated so we add it
-        labels.push(new_label.clone());
-        return true;
+        labels.push(Rc::clone(new_label));
+        true
     }
 }
 
@@ -116,29 +124,29 @@ pub fn solve(d: &tsp::TSPData, nresources: usize, resourcecapacity: usize, maxle
     q.push_back(0);
     in_q[0] = true;
     // considered labels at each node
-    let mut labels: Vec<Vec<LabelRef>> = vec![Vec::new(); d.n];
+    let mut labels: Vec<Vec<Rc<Label>>> = vec![Vec::new(); d.n];
     labels[0].push(l0);
     // main DP loop
     while !q.is_empty() {
         let n = q.pop_front().unwrap();
         in_q[n] = false;
         for i in 0..labels[n].len() {
-            let lind = labels[n][i].clone();
-            if lind.borrow().ignore == true {
+            let lind = Rc::clone(&labels[n][i]);
+            if lind.is_ignored() {
                 continue;
             }
             for succ in 0..d.n {
-                if lind.borrow().visited[succ] || succ == n {
+                if lind.visited[succ] || succ == n {
                     continue;
                 }
                 // is the extension length-feasible?
-                if lind.borrow().length + d.d(n, succ) + d.d(succ, 0) > maxlen {
+                if lind.length + d.d(n, succ) + d.d(succ, 0) > maxlen {
                     continue;
                 }
                 // is it resource-feasible?
                 let mut rfeas: bool = true;
                 for r in 0..nresources {
-                    if (succ & (1 << r)) > 0 && lind.borrow().q[r] + 1 > resourcecapacity {
+                    if (succ & (1 << r)) > 0 && lind.q[r] + 1 > resourcecapacity {
                         rfeas = false;
                         break;
                     }
@@ -150,22 +158,23 @@ pub fn solve(d: &tsp::TSPData, nresources: usize, resourcecapacity: usize, maxle
                 let nl = Label::extend(d, &lind, succ);
                 let added = Label::updatedominance(&mut labels[succ], &nl);
                 if added {
-                    lind.borrow_mut().addsuccessor(&nl);
+                    lind.addsuccessor(&nl);
                     if !in_q[succ] && succ != 0 {
                         q.push_back(succ);
                         in_q[succ] = true;
                     }
                 }
             }
-            lind.borrow_mut().ignore = true;
+            lind.ignore();
         }
     }
-    let mut bestcost: f64 = labels[0][0].borrow().cost;
+    let mut bestcost: f64 = labels[0][0].cost;
     for i in 1..labels[0].len() {
-        let cost = labels[0][i].borrow().cost;
+        let cost = labels[0][i].cost;
         if cost < bestcost {
             bestcost = cost;
         }
     }
-    return bestcost;
+    labels[0][0].predecessor.as_ref();
+    bestcost
 }
