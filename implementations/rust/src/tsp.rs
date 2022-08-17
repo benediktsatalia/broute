@@ -164,7 +164,12 @@ impl TSPSolution {
         return checksum;
     }
 
-    pub fn espprc_indexed(&self, data: &mut TSPData, nresources: usize, resourcecapacity: usize) -> i32 {
+    pub fn espprc_indexed(
+        &self,
+        data: &mut TSPData,
+        nresources: usize,
+        resourcecapacity: usize,
+    ) -> i32 {
         let mut dual = vec![0; data.n];
         for ij in self.nodes.windows(2) {
             let (i, j) = (ij[0], ij[1]);
