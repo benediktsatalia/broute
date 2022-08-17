@@ -7,6 +7,7 @@ use cpu_time::ProcessTime;
 
 use rustc_version_runtime::version;
 
+mod espprc;
 mod espprc_indexed;
 mod maxflow;
 mod tsp;
@@ -79,6 +80,8 @@ fn benchmark_one(
             cnt = sol.lns(data, 10);
         } else if benchmarkname == "espprc-index" {
             cnt = sol.espprc_indexed(data, 6, 1);
+        } else if benchmarkname == "espprc" {
+            cnt = sol.espprc(data, 6, 1);
         } else if benchmarkname == "maxflow" {
             cnt = sol.maxflow(data);
         } else {

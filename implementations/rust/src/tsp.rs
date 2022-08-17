@@ -1,5 +1,6 @@
 use std::cmp::min;
 
+use crate::espprc;
 use crate::espprc_indexed;
 use crate::maxflow;
 
@@ -189,6 +190,34 @@ impl TSPSolution {
             maxlen += best;
         }
         return espprc_indexed::solve(data, nresources, resourcecapacity, maxlen) as i32;
+    }
+
+    pub fn espprc(&self, data: &mut TSPData, nresources: usize, resourcecapacity: usize) -> i32 {
+        let mut dual = vec![0; data.n];
+        for ij in self.nodes.windows(2) {
+            let (i, j) = (ij[0], ij[1]);
+            dual[j] = data.d(i, j);
+        }
+        for i in 0..data.n {
+            for j in 0..data.n {
+                data.setaux(i, j, f64::from(data.d(i, j) - dual[j]));
+            }
+        }
+        // max len: sum over best assignment for each node
+        let mut maxlen: i32 = 0;
+        for i in 0..data.n {
+            let mut best = i32::MAX;
+            for j in 0..data.n {
+                if i == j {
+                    continue;
+                }
+                if data.d(i, j) < best {
+                    best = data.d(i, j);
+                }
+            }
+            maxlen += best;
+        }
+        return espprc::solve(data, nresources, resourcecapacity, maxlen) as i32;
     }
 
     pub fn maxflow(&self, data: &mut TSPData) -> i32 {
