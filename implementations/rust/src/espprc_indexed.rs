@@ -89,7 +89,7 @@ impl LabelCollection {
     fn marksuccessors(&self, index: usize) {
         let Label { successors, .. } = &self.labels[index];
         for &s in successors {
-            &self.labels[s].ignore.set(true);
+            self.labels[s].ignore.set(true);
             self.marksuccessors(s);
         }
     }
